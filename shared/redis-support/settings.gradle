@@ -1,0 +1,11 @@
+rootProject.name = 'redis-support'
+
+includeBuild '../../shared/common-objects'
+
+dependencyResolutionManagement {
+    versionCatalogs {
+        libs {
+            from(files("../../gradle/libs.versions.toml"))
+        }
+    }
+}

@@ -1,0 +1,92 @@
+plugins {
+    alias(libs.plugins.springBoot)
+    alias(libs.plugins.springDependencyManagement)
+    id 'java-library'
+    id 'jacoco'
+    alias(libs.plugins.gitProperties)
+    id "org.sonarqube" version "3.0"
+}
+
+group = 'com.otg.tech'
+version = '0.1.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(libs.versions.java.get())
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+
+    implementation platform(libs.jackson)
+    implementation 'com.fasterxml.jackson.core:jackson-annotations'
+    implementation 'org.springframework:spring-tx:6.1.6'
+    implementation libs.sl4j
+    implementation libs.apacheCommons3
+    implementation libs.commonscodec
+    implementation libs.thymeleaf
+    implementation libs.flyingSaucerPdf
+    implementation libs.jsoup
+    implementation libs.springpersistence
+    implementation libs.bundles.aopDeps
+
+    compileOnly libs.lombok
+    annotationProcessor libs.lombok
+    testImplementation libs.junitApi
+    testRuntimeOnly libs.junitEngine
+    testImplementation libs.archunit
+    testImplementation libs.sl4jSimple
+    testImplementation libs.assertj
+    implementation libs.snakeyml
+    implementation libs.springDoc
+}
+
+jacocoTestReport {
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: [
+                    "com/otg/tech/annotation/**",
+                    "com/otg/tech/constant/**",
+                    "com/otg/tech/events/**",
+                    "com/otg/tech/rest/commons/**",
+                    "com/otg/tech/util/**",
+                    "com/otg/tech/parser/**"
+            ])
+        }))
+    }
+    reports {
+        html.required = true
+        xml.required = true
+    }
+}
+test.finalizedBy jacocoTestReport
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events("passed", "failed", "skipped")
+    }
+}
+
+tasks.withType(Checkstyle).configureEach {
+    configFile file('codequality/checkstyle.xml')
+    checkstyleTest.enabled = false
+}
+
+sonarqube {
+    properties {
+        property 'sonar.exclusions', "**/com/otg/tech/config/config/**, **/com/otg/tech/config/config/**, **/com/otg/tech/config/constant/**, **/com/otg/tech/config/domain/**, **/com/otg/tech/config/exception/**, **/com/otg/tech/config/gateway/**, **/com/otg/tech/config/api/response/**, **/com/otg/tech/config/api/request/**"
+    }
+}
+
+springBoot {
+    buildInfo()
+}
+
+dependencyLocking {
+    lockAllConfigurations()
+}

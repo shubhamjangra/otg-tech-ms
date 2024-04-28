@@ -1,0 +1,22 @@
+def excludeDirs = []
+def projectDirs = ['shared', 'services']
+
+tasks.register('clean') {
+    projectDirs.each {
+        file(it).eachDir { dir ->
+            if (!excludeDirs.contains(dir.name)) {
+                dependsOn gradle.includedBuild(dir.getName()).task(':clean')
+            }
+        }
+    }
+}
+
+tasks.register('build') {
+    projectDirs.each {
+        file(it).eachDir { dir ->
+            if (!excludeDirs.contains(dir.name)) {
+                dependsOn gradle.includedBuild(dir.getName()).task(':build')
+            }
+        }
+    }
+}

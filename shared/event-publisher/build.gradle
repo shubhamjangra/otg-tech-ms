@@ -1,0 +1,59 @@
+plugins {
+    alias(libs.plugins.springDependencyManagement)
+    id 'java-library'
+    alias(libs.plugins.sonarqube)
+    id 'jacoco'
+}
+
+group = 'com.otg.tech'
+version = '0.1.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(libs.versions.java.get())
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation platform(libs.spring)
+    implementation platform(libs.jackson)
+    api "com.otg.tech:common-objects"
+    compileOnly libs.sl4j
+    implementation libs.kafka
+    compileOnly libs.springAutoConfigure
+    implementation "com.fasterxml.jackson.core:jackson-core"
+    implementation "com.fasterxml.jackson.datatype:jackson-datatype-jsr310"
+    compileOnly libs.lombok
+    annotationProcessor libs.lombok
+    testImplementation libs.junitApi
+    testRuntimeOnly libs.junitEngine
+    testImplementation libs.assertj
+    testImplementation libs.kafkaTest
+    testImplementation libs.sl4jSimple
+    testImplementation libs.springBootTest
+}
+
+jacocoTestReport {
+    reports {
+        html.required = true
+        xml.required = true
+    }
+}
+test.finalizedBy jacocoTestReport
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events("passed", "failed", "skipped")
+    }
+}
+
+sonarqube {
+    properties {
+        property "sonar.coverage.exclusions", "**/KafkaEventPublisherConfig.java"
+    }
+}

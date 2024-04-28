@@ -1,0 +1,14 @@
+rootProject.name = 'auditing-utils'
+
+includeBuild '../../shared/common-objects'
+includeBuild '../../shared/event-publisher'
+includeBuild '../../shared/auditing-utils'
+includeBuild '../../shared/auth-utils'
+
+dependencyResolutionManagement {
+    versionCatalogs {
+        libs {
+            from(files("../../gradle/libs.versions.toml"))
+        }
+    }
+}

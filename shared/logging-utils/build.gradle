@@ -1,0 +1,86 @@
+plugins {
+    alias(libs.plugins.springDependencyManagement)
+    id 'java-library'
+    id 'jacoco'
+    alias(libs.plugins.gitProperties)
+    id "org.sonarqube" version "3.0"
+}
+
+group = 'com.otg.tech'
+version = '0.1.0'
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(libs.versions.java.get())
+    }
+}
+
+dependencies {
+    implementation platform(libs.spring)
+    implementation platform(libs.jackson)
+    implementation 'io.micrometer:micrometer-tracing-bridge-brave:1.2.0'
+    implementation 'io.zipkin.reporter2:zipkin-reporter-brave:2.16.4'
+    compileOnly libs.sl4j
+    compileOnly libs.servlet
+    compileOnly libs.lombok
+    annotationProcessor libs.lombok
+    compileOnly 'com.fasterxml.jackson.core:jackson-databind'
+    compileOnly 'org.springframework:spring-web'
+    implementation 'org.springframework:spring-aop'
+    compileOnly 'org.springframework:spring-context'
+    implementation libs.bundles.aopDeps
+    implementation libs.apacheCommons3
+    implementation libs.logstash
+}
+
+jacocoTestReport {
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: [
+                    "com/au/app/logging/**"
+            ])
+        }))
+    }
+    reports {
+        html.required = true
+        xml.required = true
+        xml.destination file("${buildDir}/reports/jacoco.xml")
+    }
+}
+
+def getCurrentGitBranch() {
+    def gitBranch = "Unknown branch"
+    try {
+        def workingDir = new File("${project.projectDir}")
+        def result = 'git rev-parse --abbrev-ref HEAD'.execute(null, workingDir)
+        result.waitFor()
+        if (result.exitValue() == 0) {
+            gitBranch = result.text.trim()
+        }
+    } catch (ignored) {
+    }
+    return gitBranch
+}
+
+sonarqube {
+    properties {
+        property "sonar.java.coveragePlugin", "jacoco"
+        property "sonar.host.url", "http://10.90.64.101:9000"
+        property "sonar.login", "cb528b59eff340f44c45c2ef0fae0a04e64d1e7e"
+        property 'sonar.branch.name', getCurrentGitBranch()
+        property "sonar.coverage.jacoco.xmlReportPath", "${buildDir}/reports/jacoco.xml"
+        property "sonar.coverage.exclusions", "**/logging/**"
+    }
+}
+test.finalizedBy jacocoTestReport
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events("passed", "failed", "skipped")
+    }
+}

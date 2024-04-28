@@ -1,0 +1,31 @@
+{
+  "rules": [
+    {
+      "action": {
+        "type": "expire"
+      },
+      "selection": {
+        "countType": "imageCountMoreThan",
+        "countNumber": 10,
+        "tagStatus": "tagged",
+        "tagPrefixList": [
+          "beta"
+        ]
+      },
+      "description": "branch merge request images",
+      "rulePriority": 1
+    },
+    {
+      "rulePriority": 2,
+      "description": "all remaining images",
+      "selection": {
+        "tagStatus": "any",
+        "countType": "imageCountMoreThan",
+        "countNumber": 15
+      },
+      "action": {
+        "type": "expire"
+      }
+    }
+  ]
+}

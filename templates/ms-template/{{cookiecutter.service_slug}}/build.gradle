@@ -1,0 +1,85 @@
+plugins {
+    alias(libs.plugins.springBoot)
+    alias(libs.plugins.springDependencyManagement)
+    id 'java'
+    id 'checkstyle'
+    id 'jacoco'
+    alias(libs.plugins.gitProperties)
+}
+
+group = 'com.otg.tech'
+version = '0.1.0'
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(libs.versions.java.get())
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+jar {
+    enabled = false
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    {
+        % if
+        cookiecutter.with_db == "y" - %
+    }
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    {
+        % endif - %
+    }
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation libs.springDoc
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    implementation "com.otg.tech:common-objects"
+    implementation "com.otg.tech:logging-utils"
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+    {
+        % if
+        cookiecutter.with_db == "y" - %
+    }
+    runtimeOnly 'org.postgresql:postgresql'
+    implementation 'org.flywaydb:flyway-core'
+    {
+        % endif - %
+    }
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    {
+        % if
+        cookiecutter.with_db == "y" - %
+    }
+    testImplementation 'com.h2database:h2'
+    {
+        % endif - %
+    }
+    testImplementation 'com.otg.tech:archunit-tests'
+}
+
+jacocoTestReport {
+    reports {
+        xml.enabled true
+    }
+}
+test.finalizedBy jacocoTestReport
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events("passed", "failed", "skipped")
+    }
+}
+
+tasks.withType(Checkstyle) {
+    configFile file('codequality/checkstyle.xml')
+}
+
+springBoot {
+    buildInfo()
+}

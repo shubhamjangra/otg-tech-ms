@@ -1,0 +1,8 @@
+include:
+  - project: 'au/platform/gitlab-pipeline-library/templates'
+    ref: 'main'
+    file: '/backendServiceBuild.yaml'
+
+variables:
+  ECR_REPO: "{{cookiecutter.service_name_combined}}"
+  PROJECT: "{{cookiecutter.service_name_combined}}"

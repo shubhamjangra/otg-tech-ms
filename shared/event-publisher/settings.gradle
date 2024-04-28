@@ -1,0 +1,11 @@
+rootProject.name = 'event-publisher'
+
+includeBuild '../../shared/common-objects'
+
+dependencyResolutionManagement {
+    versionCatalogs {
+        libs {
+            from(files("../../gradle/libs.versions.toml"))
+        }
+    }
+}

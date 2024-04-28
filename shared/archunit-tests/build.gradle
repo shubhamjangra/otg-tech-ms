@@ -1,0 +1,73 @@
+plugins {
+    id 'java-library'
+    id 'jacoco'
+    alias(libs.plugins.gitProperties)
+    id "org.sonarqube" version "3.0"
+}
+
+group = 'com.otg.tech'
+version = '0.1.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(libs.versions.java.get())
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compileOnly libs.sl4j
+    implementation libs.archunit
+    api libs.archunitApi
+}
+
+jacocoTestReport {
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: [
+                    "com/otg/tech/archunit/**"
+            ])
+        }))
+    }
+    reports {
+        html.required = true
+        xml.required = true
+        xml.destination file("${buildDir}/reports/jacoco.xml")
+    }
+}
+
+def getCurrentGitBranch() {
+    def gitBranch = "Unknown branch"
+    try {
+        def workingDir = new File("${project.projectDir}")
+        def result = 'git rev-parse --abbrev-ref HEAD'.execute(null, workingDir)
+        result.waitFor()
+        if (result.exitValue() == 0) {
+            gitBranch = result.text.trim()
+        }
+    } catch (ignored) {
+    }
+    return gitBranch
+}
+
+sonarqube {
+    properties {
+        property "sonar.java.coveragePlugin", "jacoco"
+        property "sonar.host.url", "http://10.90.64.101:9000"
+        property "sonar.login", "cb528b59eff340f44c45c2ef0fae0a04e64d1e7e"
+        property 'sonar.branch.name', getCurrentGitBranch()
+        property "sonar.coverage.jacoco.xmlReportPath", "${buildDir}/reports/jacoco.xml"
+        property "sonar.coverage.exclusions", "**/archunit/**"
+    }
+}
+test.finalizedBy jacocoTestReport
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events("passed", "failed", "skipped")
+    }
+}

@@ -1,0 +1,65 @@
+plugins {
+    alias(libs.plugins.springDependencyManagement)
+    id 'java-library'
+    alias(libs.plugins.sonarqube)
+    id 'jacoco'
+}
+
+group = 'com.otg.tech'
+version = '0.1.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(libs.versions.java.get())
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation platform(libs.spring)
+    implementation platform(libs.jackson)
+    implementation libs.testng
+    implementation libs.junitJupiter
+    compileOnly libs.sl4j
+    compileOnly libs.servlet
+    implementation 'io.micrometer:micrometer-tracing-bridge-brave:1.2.0'
+    implementation 'io.zipkin.reporter2:zipkin-reporter-brave:2.16.4'
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'org.springframework:spring-context'
+    implementation 'org.springframework:spring-web'
+    implementation 'org.springframework:spring-aop'
+    compileOnly libs.springAutoConfigure
+    implementation libs.bundles.aopDeps
+    implementation "com.otg.tech:common-objects"
+    implementation "com.otg.tech:event-publisher"
+    compileOnly libs.lombok
+    annotationProcessor libs.lombok
+    testImplementation libs.junitApi
+    testRuntimeOnly libs.junitEngine
+    testImplementation libs.sl4jSimple
+    testImplementation libs.assertj
+}
+
+jacocoTestReport {
+    reports {
+        html.required = true
+        xml.required = true
+    }
+}
+test.finalizedBy jacocoTestReport
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events("passed", "failed", "skipped")
+    }
+}
+
+sonarqube {
+    properties {
+        property 'sonar.exclusions', "*"
+    }
+}

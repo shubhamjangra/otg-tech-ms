@@ -1,0 +1,67 @@
+plugins {
+    alias(libs.plugins.springBoot)
+    alias(libs.plugins.springDependencyManagement)
+    id 'java-library'
+    alias(libs.plugins.sonarqube)
+    id 'jacoco'
+}
+
+group = 'com.otg.tech'
+version = '0.1.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(libs.versions.java.get())
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'com.auth0:java-jwt:4.3.0'
+
+    compileOnly platform(libs.spring)
+    compileOnly libs.sl4j
+
+    compileOnly libs.lombok
+    annotationProcessor libs.lombok
+    testImplementation libs.assertj
+    testImplementation libs.sl4jSimple
+
+    compileOnly libs.servlet
+    implementation 'org.springframework:spring-context'
+    implementation 'org.springframework:spring-web'
+    implementation libs.springStarterAop
+    implementation "com.otg.tech:redis-support"
+    implementation "com.otg.tech:common-objects"
+    implementation(group: 'org.springframework.cloud', name: 'spring-cloud-starter-openfeign', version: libs.versions.springCloudOpenFeign.get()) {
+        exclude group: "com.squareup.okhttp3", module: "okhttp"
+    }
+}
+
+jacocoTestReport {
+    reports {
+        html.required = true
+        xml.required = true
+    }
+}
+test.finalizedBy jacocoTestReport
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events("passed", "failed", "skipped")
+    }
+}
+
+bootJar {
+    enabled = false
+}
+
+jar {
+    enabled = true
+}

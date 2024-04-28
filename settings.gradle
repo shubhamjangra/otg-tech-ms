@@ -1,0 +1,12 @@
+rootProject.name = 'otg-tech-ms'
+
+def projectDirs = [
+        'shared',
+        'services'
+]
+
+projectDirs.each {
+    file(it).eachDir { dir ->
+        includeBuild dir
+    }
+}

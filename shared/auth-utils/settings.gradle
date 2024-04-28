@@ -1,0 +1,11 @@
+rootProject.name = 'auth-utils'
+
+includeBuild '../../shared/redis-support'
+
+dependencyResolutionManagement {
+    versionCatalogs {
+        libs {
+            from(files("../../gradle/libs.versions.toml"))
+        }
+    }
+}
