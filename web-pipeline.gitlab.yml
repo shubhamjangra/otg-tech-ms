@@ -1,0 +1,135 @@
+include:
+  - project: "au/platform/gitlab-pipeline-library/common-stages"
+    ref: main
+    file:
+      - "/.gradlebuild.yaml"
+      - "/.createecr.yaml"
+      - "/.kanikopublish.yaml"
+      - "/.update-image-tag.yaml"
+      - "/.helm-chart-deploy.yaml"
+
+stages:
+  - services
+  - web-build
+  - web-ecr
+  - web-publish
+  - web-update-tag
+  - web-deploy
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline" && $CI_COMMIT_BRANCH == "dev"
+      variables:
+        ECR_REPO: ${WEB_SERVICE_NAME}
+        ENV: "dev"
+        HELM_NAMESPACE: "dev-mib"
+        PROJECT: ${WEB_SERVICE_NAME}
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline" && $CI_COMMIT_BRANCH == "dev-ci-test"
+      variables:
+        ECR_REPO: ${WEB_SERVICE_NAME}
+        ENV: "dev"
+        HELM_NAMESPACE: "dev-mib"
+        PROJECT: ${WEB_SERVICE_NAME}
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline" && $CI_COMMIT_BRANCH == "sit"
+      variables:
+        ECR_REPO: ${WEB_SERVICE_NAME}-sit
+        ENV: "sit"
+        HELM_NAMESPACE: "sit-mib"
+        PROJECT: ${WEB_SERVICE_NAME}
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline" && $CI_COMMIT_BRANCH == "uat"
+      variables:
+        ECR_REPO: ${WEB_SERVICE_NAME}-uat
+        ENV: "uat"
+        HELM_NAMESPACE: "uat-mib"
+        PROJECT: ${WEB_SERVICE_NAME}
+
+restart:
+  stage: services
+  tags:
+    - dev
+  image: "039912797956.dkr.ecr.ap-south-1.amazonaws.com/infra-pipeline-tool:v0.3.0"
+  script:
+    - echo ${WEB_SERVICE_NAME}
+    - echo ${WEB_SERVICE_ENV}
+    - |
+      if [ "${WEB_SERVICE_ENV}" = "dev" ]; then
+        DEPLOYMENT_NAME=${WEB_SERVICE_NAME}
+      else
+        DEPLOYMENT_NAME=${WEB_SERVICE_NAME}-${WEB_SERVICE_ENV}
+      fi
+      echo "Deployment name: ${DEPLOYMENT_NAME}"
+      kubectl rollout restart deployment ${DEPLOYMENT_NAME} -n ${WEB_SERVICE_ENV}-mib
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline" && $WEB_COMMAND == "restart"
+
+Re-Deploy:
+  stage: services
+  extends: .helm-deploy
+  variables:
+    CHART_PATH: "_helm_charts/otg-tech/helm-otg-tech-service-chart-0.1.0"
+    PROJECT: ${WEB_SERVICE_NAME}
+    ENV: ${WEB_SERVICE_ENV}
+    HELM_NAMESPACE: ${WEB_SERVICE_ENV}-mib
+  before_script:
+    - git clone https://oauth2:$CLONE_KEY@gitlabdev.aubankuat.in/au/platform/apps-infra-manifests.git
+    - cd apps-infra-manifests
+    - git checkout main
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline" && $WEB_COMMAND == "redeploy")
+
+Build:
+  stage: web-build
+  extends: .gradle-build
+  variables:
+    KUBERNETES_CPU_REQUEST: "2000m"
+    KUBERNETES_MEMORY_REQUEST: "3000Mi"
+  tags:
+    - dev
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline" && $WEB_COMMAND == "rebuild")
+
+Create ECR:
+  stage: web-ecr
+  dependencies:
+    - "Build"
+  extends: .create-ecr
+  tags:
+    - dev
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline" && $WEB_COMMAND == "rebuild")
+
+Docker Publish:
+  stage: web-publish
+  dependencies:
+    - "Create ECR"
+  extends: .kaniko-publish
+  variables:
+    PROJECT: ${WEB_SERVICE_NAME}
+  tags:
+    - dev
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline" && $WEB_COMMAND == "rebuild")
+
+Update Image Tag:
+  stage: web-update-tag
+  dependencies:
+    - "Docker Publish"
+  extends: .update-image-tag
+  tags:
+    - dev
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline" && $WEB_COMMAND == "rebuild")
+
+Deploy:
+  stage: web-deploy
+  dependencies:
+    - "Update Image Tag"
+  extends: .helm-deploy
+  variables:
+    CHART_PATH: "_helm_charts/otg-tech/helm-otg-tech-service-chart-0.1.0"
+  before_script:
+    - git clone https://oauth2:$CLONE_KEY@gitlabdev.aubankuat.in/au/platform/apps-infra-manifests.git
+    - cd apps-infra-manifests
+    - git checkout main
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline" && $WEB_COMMAND == "rebuild")

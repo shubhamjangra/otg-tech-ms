@@ -31,7 +31,7 @@ public class LoggingAspect {
         // Method is empty as this is just a Pointcut, the implementations are in the advices.
     }
 
-    @Pointcut("within(com.au..*) || within(*.controller..*) || within(*.service..*)")
+    @Pointcut("within(com.otg..*) || within(*.controller..*) || within(*.service..*)")
     public void applicationPackagePointcut() {
         // Method is empty as this is just a Pointcut, the implementations are in the advices.
     }

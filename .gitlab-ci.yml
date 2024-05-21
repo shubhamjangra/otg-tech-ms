@@ -1,0 +1,358 @@
+stages:
+  - init
+  - services
+  # - web-build
+  # - web-ecr
+  # - web-publish
+  # - web-update-tag
+  # - web-deploy
+
+variables:
+  WEB_SERVICE_ENV:
+    description: "Choose service environment [ dev / sit / uat ]"
+    value: "dev"
+  WEB_COMMAND:
+    description: "Choose command [ restart / redeploy / rebuild ]"
+    value: "restart"
+
+init:
+  image: "039912797956.dkr.ecr.ap-south-1.amazonaws.com/infra-pipeline-tool:v0.5.1"
+  stage: init
+  variables:
+    TRIGGER_VARIABLE: MR_SOURCE_BRANCH_${CI_COMMIT_BRANCH}
+  tags:
+    - dev
+  script:
+    - |
+      TRIGGER_VARIABLE=${TRIGGER_VARIABLE^^}
+      # Extracting "MR source branch" from "SIT"
+      INTERNAL_SOURCE_BRANCH=$(curl "https://gitlabdev.aubankuat.in/api/v4/projects/${CI_PROJECT_ID}/repository/commits/${CI_COMMIT_SHA}?access_token=${CLONE_KEY}" | jq -r '.title' | awk -F "'" '{print $2}')
+      echo "Name of the merged source branch is: ${INTERNAL_SOURCE_BRANCH}"
+      # sending a delete "global variable" request to gitlab as we cannot update the same variable by a API. 
+      http_code=$(curl --write-out '%{http_code}' --request DELETE --header "PRIVATE-TOKEN:${CLONE_KEY}" "https://gitlabdev.aubankuat.in/api/v4/projects/${CI_PROJECT_ID}/variables/${TRIGGER_VARIABLE}")
+      http_code=$(echo $http_code | jq -r . | tail -n 1)
+      if ([ $http_code -le 200 ] || [ $http_code -ge 299 ]) && [ $http_code -ne 404 ]; 
+      then
+        echo "received ${http_code} status code: failed to delete global variable ${TRIGGER_VARIABLE} in gitlab"
+        exit 1
+      fi 
+      # sending a create "global variable" request to gitlab
+      http_code=$(curl --write-out '%{http_code}' --request POST --header "PRIVATE-TOKEN:${CLONE_KEY}" "https://gitlabdev.aubankuat.in/api/v4/projects/${CI_PROJECT_ID}/variables" --form "key=${TRIGGER_VARIABLE}" --form "value=${INTERNAL_SOURCE_BRANCH}")
+      http_code=$(echo $http_code | jq -r . | tail -n 1)
+      if ([ $http_code -le 200 ] || [ $http_code -ge 299 ]); 
+      then
+        echo "received ${http_code} status code: failed to create global variable ${TRIGGER_VARIABLE} in gitlab"
+        exit 1
+      fi
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "sit"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "uat"
+
+web-job:
+  stage: services
+  inherit:
+    variables: true
+  trigger:
+    include: "web-pipeline.gitlab.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+app-service:
+  stage: services
+  trigger:
+    include: "services/app-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/app-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/app-service/**/*"
+
+notification-service:
+  stage: services
+  trigger:
+    include: "services/notification-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/notification-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/notification-service/**/*"
+
+master-service:
+  stage: services
+  trigger:
+    include: "services/master-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/master-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/master-service/**/*"
+
+authentication-service:
+  stage: services
+  trigger:
+    include: "services/authentication-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/authentication-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/authentication-service/**/*"
+
+deposit-service:
+  stage: services
+  trigger:
+    include: "services/deposit-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/deposit-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/deposit-service/**/*"
+
+onboarding-service:
+  stage: services
+  trigger:
+    include: "services/onboarding-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/onboarding-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/onboarding-service/**/*"
+
+integration-service:
+  stage: services
+  trigger:
+    include: "services/integration-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/integration-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/integration-service/**/*"
+
+keycloak-service:
+  stage: services
+  trigger:
+    include: "services/keycloak-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/keycloak-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/keycloak-service/**/*"
+
+case-management-service:
+  stage: services
+  trigger:
+    include: "services/case-management-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/case-management-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/case-management-service/**/*"
+
+debit-card-service:
+  stage: services
+  trigger:
+    include: "services/debit-card-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/debit-card-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/debit-card-service/**/*"
+
+rbac-service:
+  stage: services
+  trigger:
+    include: "services/rbac-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/rbac-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/rbac-service/**/*"
+
+inventory-service:
+  stage: services
+  trigger:
+    include: "services/inventory-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/inventory-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/inventory-service/**/*"
+
+user-management-service-2:
+  stage: services
+  trigger:
+    include: "services/user-management-service-2/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/user-management-service-2/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/user-management-service-2/**/*"
+
+csr-service:
+  stage: services
+  trigger:
+    include: "services/csr-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/csr-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/csr-service/**/*"
+
+settlement-service:
+  stage: services
+  trigger:
+    include: "services/settlement-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/settlement-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/settlement-service/**/*"
+
+config-service:
+  stage: services
+  trigger:
+    include: "services/config-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/config-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/config-service/**/*"
+
+consent-service:
+  stage: services
+  trigger:
+    include: "services/consent-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/consent-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/consent-service/**/*"
+
+merchant-management-service:
+  stage: services
+  trigger:
+    include: "services/merchant-management-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/merchant-management-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/merchant-management-service/**/*"
+
+limit-service:
+  stage: services
+  trigger:
+    include: "services/limit-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/limit-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/limit-service/**/*"
+
+audit-service:
+  stage: services
+  trigger:
+    include: "services/audit-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/audit-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/audit-service/**/*"
+
+auth-matrix-service:
+  stage: services
+  trigger:
+    include: "services/auth-matrix-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/auth-matrix-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/auth-matrix-service/**/*"
+
+payments-service:
+  stage: services
+  trigger:
+    include: "services/payments-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/payments-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/payments-service/**/*"
+
+user-management-service:
+  stage: services
+  trigger:
+    include: "services/user-management-service/.gitlab-ci.yml"
+    strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "xebia-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "au-dev" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "sit" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "uat")
+      changes:
+        - "services/user-management-service/**/*"
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "sit" || $CI_COMMIT_BRANCH == "uat"
+      changes:
+        - "services/user-management-service/**/*"        

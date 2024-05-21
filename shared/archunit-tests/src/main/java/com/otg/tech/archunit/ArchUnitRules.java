@@ -98,7 +98,7 @@ public abstract class ArchUnitRules {
 
     public static ArchRule allPublicMethodsInConstructorReturnApiResponseWrapper() {
         return methods().that().areDeclaredInClassesThat().resideInAPackage("..controller..").and().arePublic().should()
-                .haveRawReturnType("com.otg.tech.rest.commons.ApiResponse")
+                .haveRawReturnType("com.otg.tech.commons.ApiResponse")
                 .orShould(new ArchCondition<>("return CompletableFuture<ApiResponse>") {
                     @Override
                     public void check(JavaMethod item, ConditionEvents events) {
@@ -106,9 +106,9 @@ public abstract class ArchUnitRules {
                         if (genericReturnType instanceof ParameterizedType gre) {
                             Type[] actualTypeArguments = gre.getActualTypeArguments();
                             for (Type actualTypeArgument : actualTypeArguments) {
-                                if (!(actualTypeArgument.getTypeName().equals("com.otg.tech.rest.commons.ApiResponse<?>")
+                                if (!(actualTypeArgument.getTypeName().equals("com.otg.tech.commons.ApiResponse<?>")
                                         || actualTypeArgument.getTypeName()
-                                        .equals("com.otg.tech.rest.commons.RestResponse<?>"))) {
+                                        .equals("com.otg.tech.commons.RestResponse<?>"))) {
                                     events.add(new SimpleConditionEvent(item, false,
                                             "return CompletableFuture<ApiResponse>"));
                                 }

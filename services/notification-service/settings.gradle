@@ -1,0 +1,14 @@
+rootProject.name = 'notification-service'
+
+includeBuild '../../shared/common-objects'
+includeBuild '../../shared/logging-utils'
+includeBuild '../../shared/archunit-tests'
+includeBuild '../../shared/auditing-utils'
+
+dependencyResolutionManagement {
+    versionCatalogs {
+        libs {
+            from(files("../../gradle/libs.versions.toml"))
+        }
+    }
+}

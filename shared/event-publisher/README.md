@@ -24,7 +24,7 @@ Add below properties in application.properties to enable kafka
 
 ```
 ## Kafka based Event publisher support
-au.kafka.event.publisher.enabled=true
+kafka.event.publisher.enabled=true
 ```
 
 Also Add below in Docker file
